@@ -1,1 +1,66 @@
+name: Build AyaPy 3.0
 
+on:
+workflow_dispatch:
+
+jobs:
+build:
+runs-on: ubuntu-latest
+
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
+  - name: Set up Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: '17'
+
+  - name: Set up Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: '3.13'
+
+  - name: Set up Gradle
+    uses: gradle/actions/setup-gradle@v4
+    with:
+      gradle-version: '8.13'
+
+  - name: Find and extract AyaPy source
+    run: |
+      ZIP=$(find . -maxdepth 2 -iname "AyaPy-3.0-Source.zip" | head -n 1)
+
+      if [ -z "$ZIP" ]; then
+        echo "AyaPy-3.0-Source.zip not found!"
+        exit 1
+      fi
+
+      mkdir extracted
+      unzip -q "$ZIP" -d extracted
+
+      echo "Extracted project files:"
+      find extracted -maxdepth 3 -type f | head -100
+
+  - name: Locate Android project
+    run: |
+      PROJECT=$(find extracted -name settings.gradle.kts -printf '%h\n' | head -n 1)
+
+      if [ -z "$PROJECT" ]; then
+        echo "Android Gradle project not found!"
+        exit 1
+      fi
+
+      echo "PROJECT_DIR=$PROJECT" >> $GITHUB_ENV
+
+  - name: Build APK
+    run: |
+      cd "$PROJECT_DIR"
+      gradle --no-daemon assembleDebug
+
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: AyaPy-3.0-APK
+      path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+      if-no-files-found: error
